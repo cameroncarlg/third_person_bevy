@@ -2,7 +2,7 @@ use bevy::{asset::UnapprovedPathMode, prelude::*};
 
 mod camera;
 
-use crate::camera::CameraPlugin;
+use crate::camera::{CameraPlugin, OrbitTarget};
 
 #[derive(Component)]
 struct Player;
@@ -44,6 +44,19 @@ fn setup(
         Transform::from_xyz(0.0, 0.5, 0.0),
         Player,
         Velocity::default(),
+        OrbitTarget,
+    ));
+
+    // plane
+    commands.spawn((
+        Name::new("Plane"),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(5.0, 5.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.3, 0.5, 0.3),
+            // Turning off culling keeps the plane visible when viewed from beneath.
+            cull_mode: None,
+            ..default()
+        })),
     ));
 
     // Lighting
@@ -66,7 +79,6 @@ fn setup(
     //));
 }
 
-/*
 fn move_player(
     player: Single<(&mut Transform, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
@@ -111,7 +123,6 @@ fn move_player(
     //let mut transform = query.single_mut();
     transform.translation += direction * speed * time.delta_secs();
 }
-*/
 
 //fn check_scene_loaded(scenes: Query<&SceneRoot>, asset_server: Res<AssetServer>) {
 //    for scene in &scenes {
