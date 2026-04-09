@@ -1,5 +1,9 @@
 use bevy::{asset::UnapprovedPathMode, prelude::*};
 
+mod camera;
+
+use crate::camera::CameraPlugin;
+
 #[derive(Component)]
 struct Player;
 
@@ -20,6 +24,7 @@ fn main() {
             unapproved_path_mode: UnapprovedPathMode::Allow,
             ..default()
         }))
+        .add_plugins(CameraPlugin)
         .add_systems(Startup, (setup, load_gltf_things).chain())
         .add_systems(Update, (move_player, check_scene_loaded))
         .run();
@@ -52,14 +57,14 @@ fn setup(
     ));
 
     // Camera
-    commands.spawn((
-        MainCamera,
-        Transform::from_xyz(100.0, 50000.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
-        Projection::Perspective(PerspectiveProjection {
-            far: 10_000.0,
-            ..default()
-        }),
-    ));
+    //commands.spawn((
+    //    MainCamera,
+    //    Transform::from_xyz(100.0, 50000.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
+    //    Projection::Perspective(PerspectiveProjection {
+    //        far: 10_000.0,
+    //        ..default()
+    //    }),
+    //));
 }
 
 fn move_player(
