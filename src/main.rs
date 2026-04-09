@@ -25,8 +25,7 @@ fn main() {
             ..default()
         }))
         .add_plugins(CameraPlugin)
-        .add_systems(Startup, (setup, load_gltf_things).chain())
-        .add_systems(Update, (move_player, check_scene_loaded))
+        .add_systems(Startup, setup)
         .run();
 }
 
@@ -67,6 +66,7 @@ fn setup(
     //));
 }
 
+/*
 fn move_player(
     player: Single<(&mut Transform, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
@@ -111,16 +111,17 @@ fn move_player(
     //let mut transform = query.single_mut();
     transform.translation += direction * speed * time.delta_secs();
 }
+*/
 
-fn check_scene_loaded(scenes: Query<&SceneRoot>, asset_server: Res<AssetServer>) {
-    for scene in &scenes {
-        let state = asset_server.get_load_state(scene.0.id());
-        info!("{:?}", state);
-    }
-}
-
-fn load_gltf_things(mut commands: Commands, server: Res<AssetServer>) {
-    commands.spawn(SceneRoot(
-        server.load("uploads_files_2720101_BusGameMap.glb#Scene0"),
-    ));
-}
+//fn check_scene_loaded(scenes: Query<&SceneRoot>, asset_server: Res<AssetServer>) {
+//    for scene in &scenes {
+//        let state = asset_server.get_load_state(scene.0.id());
+//        info!("{:?}", state);
+//    }
+//}
+//
+//fn load_gltf_things(mut commands: Commands, server: Res<AssetServer>) {
+//    commands.spawn(SceneRoot(
+//        server.load("uploads_files_2720101_BusGameMap.glb#Scene0"),
+//    ));
+//}
