@@ -1,7 +1,7 @@
 use bevy::{
     camera_controller::free_camera::{FreeCamera, FreeCameraPlugin},
     color::palettes::basic::SILVER,
-    input::mouse::AccumulatedMouseMotion,
+    input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll},
     prelude::*,
 };
 
@@ -15,10 +15,12 @@ pub struct MainCamera;
 #[derive(Component)]
 pub struct OrbitTarget;
 
+
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, initialize_camera)
-            .add_systems(Update, camera_movement_system);
+        app.init_resource::<CameraOrbit>()
+            .add_systems(Startup, initialize_camera)
+            .add_systems(Update, camera_follow_system);
     }
 }
 
@@ -26,7 +28,7 @@ fn initialize_camera(mut commands: Commands) {
     // This is a custom camera setup
     commands.spawn((
         MainCamera,
-        //Transform::from_xyz(100.0, 50000.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 5.0, 5.0).looking_at(Vec3::new(0.0, 0.5, 0.0), Vec3::Y),
         //Projection::Perspective(PerspectiveProjection {
         //    far: 10_000.0,
         //    ..default()
@@ -75,19 +77,14 @@ fn rotate_camera_to_mouse(
 }
 */
 
+/*
 fn camera_movement_system(
-    input: Res<ButtonInput<KeyCode>>,
     mouse_input: Res<ButtonInput<MouseButton>>,
     mouse_motion: Res<AccumulatedMouseMotion>,
+    mouse_scroll: Res<AccumulatedMouseScroll>,
     mut camera: Single<&mut Transform, (With<MainCamera>, Without<OrbitTarget>)>,
     orbit_target: Option<Single<&Transform, (With<OrbitTarget>, Without<MainCamera>)>>,
-    time: Res<Time>,
 ) {
-    let dt = time.delta_secs();
-    let move_speed = 10.0;
-
-    let rotate_speed = 2.0;
-
     // Right-click drag: yaw (left/right) and pitch (up/down) orbit around target
     if mouse_input.pressed(MouseButton::Right) && mouse_motion.delta != Vec2::ZERO {
         let sensitivity = 0.005;
@@ -111,30 +108,66 @@ fn camera_movement_system(
         }
     }
 
-    /*
-    let mut direction = Vec3::ZERO;
+    // Scroll wheel: zoom in/out along camera's forward axis
+    if mouse_scroll.delta.y != 0.0 {
+        let zoom_speed = 5.0;
+        let forward = *camera.forward();
+        camera.translation += forward * mouse_scroll.delta.y * zoom_speed;
+    }
+}
+*/
 
-    // Forward/Backward (W/S)
-    if input.pressed(KeyCode::KeyW) {
-        direction += *camera.forward();
+#[derive(Resource)]
+struct CameraOrbit {
+    yaw: f32,
+    pitch: f32,
+    distance: f32,
+}
+
+impl Default for CameraOrbit {
+    fn default() -> Self {
+        Self {
+            yaw: 0.0,
+            pitch: 0.7, // ~40 degrees above horizontal
+            distance: 7.0,
+        }
     }
-    if input.pressed(KeyCode::KeyS) {
-        direction -= *camera.forward();
+}
+
+fn camera_follow_system(
+    mouse_input: Res<ButtonInput<MouseButton>>,
+    mouse_motion: Res<AccumulatedMouseMotion>,
+    mouse_scroll: Res<AccumulatedMouseScroll>,
+    mut orbit: ResMut<CameraOrbit>,
+    mut camera: Single<&mut Transform, (With<MainCamera>, Without<OrbitTarget>)>,
+    target: Option<Single<&Transform, (With<OrbitTarget>, Without<MainCamera>)>>,
+) {
+    // Right-click drag: rotate orbit angle
+    if mouse_input.pressed(MouseButton::Right) && mouse_motion.delta != Vec2::ZERO {
+        let sensitivity = 0.005;
+        orbit.yaw -= mouse_motion.delta.x * sensitivity;
+        const PITCH_MIN: f32 = 0.05;
+        const PITCH_MAX: f32 = std::f32::consts::FRAC_PI_2 - 0.05;
+        orbit.pitch = (orbit.pitch + mouse_motion.delta.y * sensitivity).clamp(PITCH_MIN, PITCH_MAX);
     }
 
-    // Left/Right (A/D)
-    if input.pressed(KeyCode::KeyA) {
-        direction -= *camera.right();
-    }
-    if input.pressed(KeyCode::KeyD) {
-        direction += *camera.right();
+    // Scroll wheel: zoom in/out
+    if mouse_scroll.delta.y != 0.0 {
+        orbit.distance = (orbit.distance - mouse_scroll.delta.y * 1.5).clamp(2.0, 50.0);
     }
 
-    if direction != Vec3::ZERO {
-        let direction = direction.normalize();
-        camera.translation += direction * move_speed * dt;
-    }
-    */
+    // Follow target: recompute camera position every frame
+    let target_pos = target.map(|t| t.translation).unwrap_or(Vec3::ZERO);
+
+    let horizontal = orbit.distance * orbit.pitch.cos();
+    let offset = Vec3::new(
+        horizontal * orbit.yaw.sin(),
+        orbit.distance * orbit.pitch.sin(),
+        horizontal * orbit.yaw.cos(),
+    );
+
+    camera.translation = target_pos + offset;
+    camera.look_at(target_pos, Vec3::Y);
 }
 
 /*

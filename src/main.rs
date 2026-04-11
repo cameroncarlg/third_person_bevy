@@ -26,6 +26,7 @@ fn main() {
         }))
         .add_plugins(CameraPlugin)
         .add_systems(Startup, setup)
+        .add_systems(Update, move_player)
         .run();
 }
 
@@ -34,29 +35,35 @@ fn main() {
 // Setup a simple 3d scene
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    //mut meshes: ResMut<Assets<Mesh>>,
+    //mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
-    // spawn cube, color, assign it as the player, assign it velocity
+    // spawn girl model as the player
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::default())),
-        MeshMaterial3d(materials.add(Color::srgb(0.9, 0.9, 0.6))),
-        Transform::from_xyz(0.0, 0.5, 0.0),
+        SceneRoot(asset_server.load("girl.glb#Scene0")),
+        Transform::from_xyz(0.0, 0.0, 0.0),
         Player,
         Velocity::default(),
         OrbitTarget,
     ));
 
     // plane
+    //commands.spawn((
+    //    Name::new("Plane"),
+    //    Mesh3d(meshes.add(Plane3d::default().mesh().size(5.0, 5.0))),
+    //    MeshMaterial3d(materials.add(StandardMaterial {
+    //        base_color: Color::srgb(0.3, 0.5, 0.3),
+    //        // Turning off culling keeps the plane visible when viewed from beneath.
+    //        cull_mode: None,
+    //        ..default()
+    //    })),
+    //));
+
+    // Bus stop scene
     commands.spawn((
-        Name::new("Plane"),
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(5.0, 5.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.3, 0.5, 0.3),
-            // Turning off culling keeps the plane visible when viewed from beneath.
-            cull_mode: None,
-            ..default()
-        })),
+        SceneRoot(asset_server.load("busstop.glb#Scene0")),
+        Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
     // Lighting
@@ -83,12 +90,11 @@ fn move_player(
     player: Single<(&mut Transform, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    //mut query: Query<(&mut Transform, &mut Velocity), With<Player>>,
 ) {
     let (mut transform, mut velocity) = player.into_inner();
     let dt = time.delta_secs();
+    let prev = transform.translation;
 
-    // initilize empty direction
     let mut direction = Vec3::ZERO;
 
     if input.pressed(KeyCode::KeyW) {
@@ -110,6 +116,7 @@ fn move_player(
     }
 
     // apply gravity
+    //let low_grav = GRAVITY / 3.;
     velocity.0.y += GRAVITY * dt;
     transform.translation.y += velocity.0.y * dt;
 
@@ -120,8 +127,12 @@ fn move_player(
     }
 
     let speed = 5.0;
-    //let mut transform = query.single_mut();
-    transform.translation += direction * speed * time.delta_secs();
+    transform.translation += direction * speed * dt;
+
+    if transform.translation != prev {
+        let t = transform.translation;
+        info!("Player position: ({:.2}, {:.2}, {:.2})", t.x, t.y, t.z);
+    }
 }
 
 //fn check_scene_loaded(scenes: Query<&SceneRoot>, asset_server: Res<AssetServer>) {
@@ -134,5 +145,9 @@ fn move_player(
 //fn load_gltf_things(mut commands: Commands, server: Res<AssetServer>) {
 //    commands.spawn(SceneRoot(
 //        server.load("uploads_files_2720101_BusGameMap.glb#Scene0"),
+//    ));
+//}
+//    ));
+//}
 //    ));
 //}
