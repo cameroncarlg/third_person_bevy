@@ -118,10 +118,10 @@ fn camera_movement_system(
 */
 
 #[derive(Resource)]
-struct CameraOrbit {
-    yaw: f32,
-    pitch: f32,
-    distance: f32,
+pub struct CameraOrbit {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub distance: f32,
 }
 
 impl Default for CameraOrbit {
@@ -153,7 +153,7 @@ fn camera_follow_system(
 
     // Scroll wheel: zoom in/out
     if mouse_scroll.delta.y != 0.0 {
-        orbit.distance = (orbit.distance - mouse_scroll.delta.y * 1.5).clamp(2.0, 50.0);
+        orbit.distance = (orbit.distance - mouse_scroll.delta.y * 0.5).clamp(2.0, 20.0);
     }
 
     // Follow target: recompute camera position every frame

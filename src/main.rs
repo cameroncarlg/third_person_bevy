@@ -2,7 +2,7 @@ use bevy::{asset::UnapprovedPathMode, prelude::*};
 
 mod camera;
 
-use crate::camera::{CameraPlugin, OrbitTarget};
+use crate::camera::{CameraOrbit, CameraPlugin, OrbitTarget};
 
 #[derive(Component)]
 struct Player;
@@ -16,7 +16,8 @@ pub struct MainCamera;
 
 const GRAVITY: f32 = -9.8;
 const JUMP_SPEED: f32 = 5.0;
-const GROUND_Y: f32 = 0.5;
+const GROUND_Y: f32 = 0.0;
+const SPRINT_SPEED: f32 = 5.0;
 
 fn main() {
     App::new()
@@ -27,16 +28,13 @@ fn main() {
         .add_plugins(CameraPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, move_player)
+        .add_systems(Update, make_materials_double_sided)
         .run();
 }
-
-//fn initialize_camera(mut commands: Commands) {}
 
 // Setup a simple 3d scene
 fn setup(
     mut commands: Commands,
-    //mut meshes: ResMut<Assets<Mesh>>,
-    //mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
     // spawn girl model as the player
@@ -48,21 +46,9 @@ fn setup(
         OrbitTarget,
     ));
 
-    // plane
-    //commands.spawn((
-    //    Name::new("Plane"),
-    //    Mesh3d(meshes.add(Plane3d::default().mesh().size(5.0, 5.0))),
-    //    MeshMaterial3d(materials.add(StandardMaterial {
-    //        base_color: Color::srgb(0.3, 0.5, 0.3),
-    //        // Turning off culling keeps the plane visible when viewed from beneath.
-    //        cull_mode: None,
-    //        ..default()
-    //    })),
-    //));
-
-    // Bus stop scene
+    // PS1 scene
     commands.spawn((
-        SceneRoot(asset_server.load("busstop.glb#Scene0")),
+        SceneRoot(asset_server.load("ps1_objects.glb#Scene0")),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
@@ -74,28 +60,35 @@ fn setup(
         },
         Transform::from_xyz(4.0, 8.0, 4.0),
     ));
+}
 
-    // Camera
-    //commands.spawn((
-    //    MainCamera,
-    //    Transform::from_xyz(100.0, 50000.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
-    //    Projection::Perspective(PerspectiveProjection {
-    //        far: 10_000.0,
-    //        ..default()
-    //    }),
-    //));
+fn make_materials_double_sided(
+    mesh_materials: Query<
+        &MeshMaterial3d<StandardMaterial>,
+        Added<MeshMaterial3d<StandardMaterial>>,
+    >,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for handle in &mesh_materials {
+        if let Some(mat) = materials.get_mut(&handle.0) {
+            mat.double_sided = true;
+            mat.cull_mode = None;
+        }
+    }
 }
 
 fn move_player(
     player: Single<(&mut Transform, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    orbit: Res<CameraOrbit>,
 ) {
     let (mut transform, mut velocity) = player.into_inner();
     let dt = time.delta_secs();
     let prev = transform.translation;
 
     let mut direction = Vec3::ZERO;
+    let mut strafing = false;
 
     if input.pressed(KeyCode::KeyW) {
         direction.z -= 1.0;
@@ -109,6 +102,17 @@ fn move_player(
     if input.pressed(KeyCode::KeyD) {
         direction.x += 1.0;
     }
+    if input.pressed(KeyCode::KeyQ) {
+        direction.x -= 1.0;
+        strafing = true;
+    }
+    if input.pressed(KeyCode::KeyE) {
+        direction.x += 1.0;
+        strafing = true;
+    }
+
+    // Pure strafe: no forward/back input alongside Q/E
+    let pure_strafe = strafing && !input.pressed(KeyCode::KeyW) && !input.pressed(KeyCode::KeyS);
 
     let on_ground = transform.translation.y <= GROUND_Y;
     if input.just_pressed(KeyCode::Space) && on_ground {
@@ -116,7 +120,6 @@ fn move_player(
     }
 
     // apply gravity
-    //let low_grav = GRAVITY / 3.;
     velocity.0.y += GRAVITY * dt;
     transform.translation.y += velocity.0.y * dt;
 
@@ -126,28 +129,29 @@ fn move_player(
         velocity.0.y = 0.0;
     }
 
-    let speed = 5.0;
-    transform.translation += direction * speed * dt;
+    // Rotate input direction by camera yaw so movement is relative to where the camera faces
+    let yaw = orbit.yaw;
+    let camera_relative_dir = Vec3::new(
+        direction.x * yaw.cos() + direction.z * yaw.sin(),
+        0.0,
+        -direction.x * yaw.sin() + direction.z * yaw.cos(),
+    );
+
+    let speed = SPRINT_SPEED;
+    if camera_relative_dir.length_squared() > 0.001 {
+        let move_dir = camera_relative_dir.normalize();
+        transform.translation += move_dir * speed * dt;
+        if pure_strafe {
+            // Keep the character facing camera-forward while sliding sideways
+            transform.rotation = Quat::from_rotation_y(yaw + std::f32::consts::PI);
+        } else {
+            let facing_angle = move_dir.x.atan2(move_dir.z);
+            transform.rotation = Quat::from_rotation_y(facing_angle);
+        }
+    }
 
     if transform.translation != prev {
         let t = transform.translation;
         info!("Player position: ({:.2}, {:.2}, {:.2})", t.x, t.y, t.z);
     }
 }
-
-//fn check_scene_loaded(scenes: Query<&SceneRoot>, asset_server: Res<AssetServer>) {
-//    for scene in &scenes {
-//        let state = asset_server.get_load_state(scene.0.id());
-//        info!("{:?}", state);
-//    }
-//}
-//
-//fn load_gltf_things(mut commands: Commands, server: Res<AssetServer>) {
-//    commands.spawn(SceneRoot(
-//        server.load("uploads_files_2720101_BusGameMap.glb#Scene0"),
-//    ));
-//}
-//    ));
-//}
-//    ));
-//}
