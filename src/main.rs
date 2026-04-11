@@ -18,6 +18,7 @@ const GRAVITY: f32 = -9.8;
 const JUMP_SPEED: f32 = 5.0;
 const GROUND_Y: f32 = 0.0;
 const SPRINT_SPEED: f32 = 5.0;
+const TURN_SPEED: f32 = 2.0; // radians per second
 
 fn main() {
     App::new()
@@ -81,55 +82,54 @@ fn move_player(
     player: Single<(&mut Transform, &mut Velocity), With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    orbit: Res<CameraOrbit>,
+    mut orbit: ResMut<CameraOrbit>,
 ) {
     let (mut transform, mut velocity) = player.into_inner();
     let dt = time.delta_secs();
     let prev = transform.translation;
 
-    let mut direction = Vec3::ZERO;
-    let mut strafing = false;
+    // A/D: rotate the character and camera together (WoW-style turning)
+    if input.pressed(KeyCode::KeyA) {
+        orbit.yaw += TURN_SPEED * dt;
+    }
+    if input.pressed(KeyCode::KeyD) {
+        orbit.yaw -= TURN_SPEED * dt;
+    }
 
+    // Character always faces directly away from the camera
+    transform.rotation = Quat::from_rotation_y(orbit.yaw + std::f32::consts::PI);
+
+    // W/S: forward/backward. Q/E: strafe without turning.
+    let mut direction = Vec3::ZERO;
     if input.pressed(KeyCode::KeyW) {
         direction.z -= 1.0;
     }
     if input.pressed(KeyCode::KeyS) {
         direction.z += 1.0;
     }
-    if input.pressed(KeyCode::KeyA) {
-        direction.x -= 1.0;
-    }
-    if input.pressed(KeyCode::KeyD) {
-        direction.x += 1.0;
-    }
     if input.pressed(KeyCode::KeyQ) {
         direction.x -= 1.0;
-        strafing = true;
     }
     if input.pressed(KeyCode::KeyE) {
         direction.x += 1.0;
-        strafing = true;
     }
-
-    // Pure strafe: no forward/back input alongside Q/E
-    let pure_strafe = strafing && !input.pressed(KeyCode::KeyW) && !input.pressed(KeyCode::KeyS);
 
     let on_ground = transform.translation.y <= GROUND_Y;
     if input.just_pressed(KeyCode::Space) && on_ground {
         velocity.0.y = JUMP_SPEED;
     }
 
-    // apply gravity
+    // Apply gravity
     velocity.0.y += GRAVITY * dt;
     transform.translation.y += velocity.0.y * dt;
 
-    // clamp to the ground
+    // Clamp to the ground
     if transform.translation.y < GROUND_Y {
         transform.translation.y = GROUND_Y;
         velocity.0.y = 0.0;
     }
 
-    // Rotate input direction by camera yaw so movement is relative to where the camera faces
+    // Rotate movement direction by camera yaw so W always moves away from the camera
     let yaw = orbit.yaw;
     let camera_relative_dir = Vec3::new(
         direction.x * yaw.cos() + direction.z * yaw.sin(),
@@ -137,17 +137,8 @@ fn move_player(
         -direction.x * yaw.sin() + direction.z * yaw.cos(),
     );
 
-    let speed = SPRINT_SPEED;
     if camera_relative_dir.length_squared() > 0.001 {
-        let move_dir = camera_relative_dir.normalize();
-        transform.translation += move_dir * speed * dt;
-        if pure_strafe {
-            // Keep the character facing camera-forward while sliding sideways
-            transform.rotation = Quat::from_rotation_y(yaw + std::f32::consts::PI);
-        } else {
-            let facing_angle = move_dir.x.atan2(move_dir.z);
-            transform.rotation = Quat::from_rotation_y(facing_angle);
-        }
+        transform.translation += camera_relative_dir.normalize() * SPRINT_SPEED * dt;
     }
 
     if transform.translation != prev {
