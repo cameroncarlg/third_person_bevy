@@ -50,6 +50,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             zoom_enabled: true,
             zoom: Zoom::new(10.0, 15.0),
             sensitivity: Vec2::new(3.0, 3.0),
+            cursor_lock_key: KeyCode::Escape,
             ..default()
         }
     ));
@@ -105,10 +106,10 @@ fn move_player(
     let (mut transform, mut velocity) = player.into_inner();
     let dt = time.delta_secs();
 
-    // Derive forward/right from the camera, projected flat onto XZ
-    let cam_fwd = camera.forward();
-    let forward = Vec3::new(cam_fwd.x, 0.0, cam_fwd.z).normalize_or_zero();
-    let right = Vec3::new(-cam_fwd.z, 0.0, cam_fwd.x).normalize_or_zero();
+    // Extract only the horizontal yaw from the camera — immune to steep pitch angles
+    let (cam_yaw, _, _) = camera.rotation.to_euler(EulerRot::YXZ);
+    let forward = Vec3::new(-cam_yaw.sin(), 0.0, -cam_yaw.cos());
+    let right   = Vec3::new( cam_yaw.cos(), 0.0, -cam_yaw.sin());
 
     // W/S: forward/backward, A/D: strafe, relative to camera facing
     let mut direction = Vec3::ZERO;
@@ -117,8 +118,8 @@ fn move_player(
     if input.pressed(KeyCode::KeyA) { direction -= right; }
     if input.pressed(KeyCode::KeyD) { direction += right; }
 
-    // Always face the camera's forward direction
-    transform.rotation = Quat::from_rotation_y(cam_fwd.x.atan2(cam_fwd.z));
+    // Always face the same horizontal direction as the camera (player faces away from camera)
+    transform.rotation = Quat::from_rotation_y(cam_yaw + std::f32::consts::PI);
 
     if direction.length_squared() > 0.001 {
         transform.translation += direction.normalize() * SPRINT_SPEED * dt;
