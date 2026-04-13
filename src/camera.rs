@@ -129,7 +129,7 @@ impl Default for CameraOrbit {
         Self {
             yaw: 0.0,
             pitch: 0.7, // ~40 degrees above horizontal
-            distance: 7.0,
+            distance: 20.0,
         }
     }
 }
