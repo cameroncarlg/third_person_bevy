@@ -1,8 +1,5 @@
 use bevy::{asset::UnapprovedPathMode, prelude::*};
-
-mod camera;
-
-use crate::camera::{CameraOrbit, CameraPlugin, OrbitTarget};
+use bevy_third_person_camera::*;
 
 #[derive(Component)]
 struct Player;
@@ -10,15 +7,10 @@ struct Player;
 #[derive(Component, Default)]
 struct Velocity(Vec3);
 
-#[derive(Component)]
-#[require(Camera3d)]
-pub struct MainCamera;
-
 const GRAVITY: f32 = -9.8;
 const JUMP_SPEED: f32 = 5.0;
 const GROUND_Y: f32 = 0.0;
 const SPRINT_SPEED: f32 = 5.0;
-const TURN_SPEED: f32 = 2.0; // radians per second
 
 fn main() {
     App::new()
@@ -26,7 +18,8 @@ fn main() {
             unapproved_path_mode: UnapprovedPathMode::Allow,
             ..default()
         }))
-        .add_plugins(CameraPlugin)
+        //.add_plugins(CameraPlugin)
+        .add_plugins(ThirdPersonCameraPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, move_player)
         .add_systems(Update, make_materials_double_sided)
@@ -34,18 +27,43 @@ fn main() {
 }
 
 // Setup a simple 3d scene
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // spawn girl model as the player
     commands.spawn((
-        SceneRoot(asset_server.load("girl.glb#Scene0")),
+        SceneRoot(asset_server.load("ps1_character.glb#Scene0")),
         Transform::from_xyz(0.0, 0.0, 0.0),
         Player,
+        ThirdPersonCameraTarget,
         Velocity::default(),
-        OrbitTarget,
     ));
+
+    // spawn camera
+    commands.spawn((
+        Camera3d::default(), 
+        ThirdPersonCamera {
+            aim_enabled: true,
+            aim_speed: 20.0,
+            aim_zoom: 0.7,
+            offset_enabled: true,
+            offset_toggle_enabled: true,
+            gamepad_settings: CustomGamepadSettings { ..default() },
+            zoom_enabled: true,
+            zoom: Zoom::new(10.0, 15.0),
+            sensitivity: Vec2::new(3.0, 3.0),
+            ..default()
+        }
+    ));
+
+    // spawn player
+    /*
+    commands.spawn((
+        Mesh3d(meshes.add(Mesh::from(Cuboid::new(1.0, 1.0, 1.0)))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
+        ThirdPersonCameraTarget,
+        Player,
+    ));
+    */
 
     // PS1 scene
     commands.spawn((
@@ -79,70 +97,42 @@ fn make_materials_double_sided(
 }
 
 fn move_player(
-    player: Single<(&mut Transform, &mut Velocity), With<Player>>,
+    player: Single<(&mut Transform, &mut Velocity), (With<Player>, Without<ThirdPersonCamera>)>,
+    camera: Single<&Transform, (With<ThirdPersonCamera>, Without<Player>)>,
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut orbit: ResMut<CameraOrbit>,
 ) {
     let (mut transform, mut velocity) = player.into_inner();
     let dt = time.delta_secs();
-    let prev = transform.translation;
 
-    // A/D: rotate the character and camera together (WoW-style turning)
-    if input.pressed(KeyCode::KeyA) {
-        orbit.yaw += TURN_SPEED * dt;
-    }
-    if input.pressed(KeyCode::KeyD) {
-        orbit.yaw -= TURN_SPEED * dt;
-    }
+    // Derive forward/right from the camera, projected flat onto XZ
+    let cam_fwd = camera.forward();
+    let forward = Vec3::new(cam_fwd.x, 0.0, cam_fwd.z).normalize_or_zero();
+    let right = Vec3::new(-cam_fwd.z, 0.0, cam_fwd.x).normalize_or_zero();
 
-    // Character always faces directly away from the camera
-    transform.rotation = Quat::from_rotation_y(orbit.yaw + std::f32::consts::PI);
-
-    // W/S: forward/backward. Q/E: strafe without turning.
+    // W/S: forward/backward, A/D: strafe, relative to camera facing
     let mut direction = Vec3::ZERO;
-    if input.pressed(KeyCode::KeyW) {
-        direction.z -= 1.0;
-    }
-    if input.pressed(KeyCode::KeyS) {
-        direction.z += 1.0;
-    }
-    if input.pressed(KeyCode::KeyQ) {
-        direction.x -= 1.0;
-    }
-    if input.pressed(KeyCode::KeyE) {
-        direction.x += 1.0;
+    if input.pressed(KeyCode::KeyW) { direction += forward; }
+    if input.pressed(KeyCode::KeyS) { direction -= forward; }
+    if input.pressed(KeyCode::KeyA) { direction -= right; }
+    if input.pressed(KeyCode::KeyD) { direction += right; }
+
+    // Always face the camera's forward direction
+    transform.rotation = Quat::from_rotation_y(cam_fwd.x.atan2(cam_fwd.z));
+
+    if direction.length_squared() > 0.001 {
+        transform.translation += direction.normalize() * SPRINT_SPEED * dt;
     }
 
+    // Jump and gravity
     let on_ground = transform.translation.y <= GROUND_Y;
     if input.just_pressed(KeyCode::Space) && on_ground {
         velocity.0.y = JUMP_SPEED;
     }
-
-    // Apply gravity
     velocity.0.y += GRAVITY * dt;
     transform.translation.y += velocity.0.y * dt;
-
-    // Clamp to the ground
     if transform.translation.y < GROUND_Y {
         transform.translation.y = GROUND_Y;
         velocity.0.y = 0.0;
-    }
-
-    // Rotate movement direction by camera yaw so W always moves away from the camera
-    let yaw = orbit.yaw;
-    let camera_relative_dir = Vec3::new(
-        direction.x * yaw.cos() + direction.z * yaw.sin(),
-        0.0,
-        -direction.x * yaw.sin() + direction.z * yaw.cos(),
-    );
-
-    if camera_relative_dir.length_squared() > 0.001 {
-        transform.translation += camera_relative_dir.normalize() * SPRINT_SPEED * dt;
-    }
-
-    if transform.translation != prev {
-        let t = transform.translation;
-        info!("Player position: ({:.2}, {:.2}, {:.2})", t.x, t.y, t.z);
     }
 }
