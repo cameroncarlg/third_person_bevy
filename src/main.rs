@@ -45,10 +45,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             aim_speed: 20.0,
             aim_zoom: 0.7,
             offset_enabled: true,
-            offset_toggle_enabled: true,
+            offset_toggle_enabled: false,
             gamepad_settings: CustomGamepadSettings { ..default() },
             zoom_enabled: true,
-            zoom: Zoom::new(10.0, 15.0),
+            zoom: Zoom::new(25.0, 60.0),
             sensitivity: Vec2::new(3.0, 3.0),
             cursor_lock_key: KeyCode::Escape,
             ..default()
@@ -117,6 +117,8 @@ fn move_player(
     if input.pressed(KeyCode::KeyS) { direction -= forward; }
     if input.pressed(KeyCode::KeyA) { direction -= right; }
     if input.pressed(KeyCode::KeyD) { direction += right; }
+    if input.pressed(KeyCode::KeyQ) { direction -= right; }
+    if input.pressed(KeyCode::KeyE) { direction += right; }
 
     // Always face the same horizontal direction as the camera (player faces away from camera)
     transform.rotation = Quat::from_rotation_y(cam_yaw + std::f32::consts::PI);
