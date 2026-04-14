@@ -68,7 +68,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     // PS1 scene
     commands.spawn((
-        SceneRoot(asset_server.load("ps1_objects.glb#Scene0")),
+        SceneRoot(asset_server.load("ps1_objects2.glb#Scene0")),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
