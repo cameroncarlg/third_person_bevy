@@ -22,7 +22,7 @@ fn main() {
         .add_plugins(ThirdPersonCameraPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, move_player)
-        .add_systems(Update, make_materials_double_sided)
+        //.add_systems(Update, make_materials_double_sided)
         .run();
 }
 
@@ -39,7 +39,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     // spawn camera
     commands.spawn((
-        Camera3d::default(), 
+        Camera3d::default(),
         ThirdPersonCamera {
             aim_enabled: true,
             aim_speed: 20.0,
@@ -52,7 +52,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             sensitivity: Vec2::new(3.0, 3.0),
             cursor_lock_key: KeyCode::Escape,
             ..default()
-        }
+        },
     ));
 
     // spawn player
@@ -82,6 +82,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 }
 
+/*
 fn make_materials_double_sided(
     mesh_materials: Query<
         &MeshMaterial3d<StandardMaterial>,
@@ -96,6 +97,7 @@ fn make_materials_double_sided(
         }
     }
 }
+ */
 
 fn move_player(
     player: Single<(&mut Transform, &mut Velocity), (With<Player>, Without<ThirdPersonCamera>)>,
@@ -109,16 +111,28 @@ fn move_player(
     // Extract only the horizontal yaw from the camera — immune to steep pitch angles
     let (cam_yaw, _, _) = camera.rotation.to_euler(EulerRot::YXZ);
     let forward = Vec3::new(-cam_yaw.sin(), 0.0, -cam_yaw.cos());
-    let right   = Vec3::new( cam_yaw.cos(), 0.0, -cam_yaw.sin());
+    let right = Vec3::new(cam_yaw.cos(), 0.0, -cam_yaw.sin());
 
     // W/S: forward/backward, A/D: strafe, relative to camera facing
     let mut direction = Vec3::ZERO;
-    if input.pressed(KeyCode::KeyW) { direction += forward; }
-    if input.pressed(KeyCode::KeyS) { direction -= forward; }
-    if input.pressed(KeyCode::KeyA) { direction -= right; }
-    if input.pressed(KeyCode::KeyD) { direction += right; }
-    if input.pressed(KeyCode::KeyQ) { direction -= right; }
-    if input.pressed(KeyCode::KeyE) { direction += right; }
+    if input.pressed(KeyCode::KeyW) {
+        direction += forward;
+    }
+    if input.pressed(KeyCode::KeyS) {
+        direction -= forward;
+    }
+    if input.pressed(KeyCode::KeyA) {
+        direction -= right;
+    }
+    if input.pressed(KeyCode::KeyD) {
+        direction += right;
+    }
+    if input.pressed(KeyCode::KeyQ) {
+        direction -= right;
+    }
+    if input.pressed(KeyCode::KeyE) {
+        direction += right;
+    }
 
     // Always face the same horizontal direction as the camera (player faces away from camera)
     transform.rotation = Quat::from_rotation_y(cam_yaw + std::f32::consts::PI);
