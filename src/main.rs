@@ -48,7 +48,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             offset_toggle_enabled: false,
             gamepad_settings: CustomGamepadSettings { ..default() },
             zoom_enabled: true,
-            zoom: Zoom::new(25.0, 60.0),
+            zoom: Zoom::new(10.0, 60.0),
             sensitivity: Vec2::new(3.0, 3.0),
             cursor_lock_key: KeyCode::Escape,
             ..default()
@@ -68,7 +68,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     // PS1 scene
     commands.spawn((
-        SceneRoot(asset_server.load("ps1_objects2.glb#Scene0")),
+        SceneRoot(asset_server.load("ps1_city.glb#Scene0")),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
@@ -82,7 +82,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 }
 
-/*
 fn make_materials_double_sided(
     mesh_materials: Query<
         &MeshMaterial3d<StandardMaterial>,
@@ -97,7 +96,6 @@ fn make_materials_double_sided(
         }
     }
 }
- */
 
 fn move_player(
     player: Single<(&mut Transform, &mut Velocity), (With<Player>, Without<ThirdPersonCamera>)>,
